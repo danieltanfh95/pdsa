@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDSA Authentication Demo</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/elliptic/6.5.4/elliptic.min.js"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+        }
+
+        .container {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 12px;
+            padding: 30px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            backdrop-filter: blur(10px);
+        }
+
+        h1 {
+            text-align: center;
+            color: #5a67d8;
+            margin-bottom: 30px;
+            font-size: 2.5em;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .auth-section {
+            background: #f8fafc;
+            border-radius: 8px;
+            padding: 25px;
+            margin: 20px 0;
+            border-left: 4px solid #5a67d8;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+        }
+
+        .auth-section h2 {
+            color: #4a5568;
+            margin-top: 0;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .form-group {
+            margin: 15px 0;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 600;
+            color: #4a5568;
+        }
+
+        input[type="text"], input[type="password"] {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e2e8f0;
+            border-radius: 6px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+            box-sizing: border-box;
+        }
+
+        input[type="text"]:focus, input[type="password"]:focus {
+            outline: none;
+            border-color: #5a67d8;
+            box-shadow: 0 0 0 3px rgba(90, 103, 216, 0.1);
+        }
+
+        button {
+            background: linear-gradient(135deg, #5a67d8, #667eea);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 600;
+            transition: all 0.3s;
+            margin: 5px;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(90, 103, 216, 0.3);
+        }
+
+        button:disabled {
+            background: #a0aec0;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .result {
+            margin: 15px 0;
+            padding: 15px;
+            border-radius: 6px;
+            font-family: 'Courier New', monospace;
+            white-space: pre-wrap;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .success {
+            background: #f0fff4;
+            color: #22543d;
+            border: 1px solid #9ae6b4;
+        }
+
+        .error {
+            background: #fed7d7;
+            color: #c53030;
+            border: 1px solid #feb2b2;
+        }
+
+        .info {
+            background: #ebf8ff;
+            color: #2c5282;
+            border: 1px solid #90cdf4;
+        }
+
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+
+        .status-success { background: #48bb78; }
+        .status-error { background: #f56565; }
+        .status-pending { background: #ed8936; }
+
+        .server-config {
+            background: #edf2f7;
+            padding: 15px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔐 PDSA Authentication Demo</h1>
+
+        <div class="server-config">
+            <label for="serverUrl"><strong>Server URL:</strong></label>
+            <input type="text" id="serverUrl" value="http://localhost:8000" placeholder="http://localhost:8000">
+        </div>
+
+        <div class="auth-section">
+            <h2>
+                <span class="status-indicator status-pending" id="registerStatus"></span>
+                User Registration
+            </h2>
+            <div class="form-group">
+                <label for="regUsername">Username:</label>
+                <input type="text" id="regUsername" placeholder="Enter username">
+            </div>
+            <div class="form-group">
+                <label for="regPassword">Password:</label>
+                <input type="password" id="regPassword" placeholder="Enter password">
+            </div>
+            <button onclick="register()" id="registerBtn">Register User</button>
+            <div id="registerResult" class="result" style="display: none;"></div>
+        </div>
+
+        <div class="auth-section">
+            <h2>
+                <span class="status-indicator status-pending" id="loginStatus"></span>
+                User Login
+            </h2>
+            <div class="form-group">
+                <label for="loginUsername">Username:</label>
+                <input type="text" id="loginUsername" placeholder="Enter username">
+            </div>
+            <div class="form-group">
+                <label for="loginPassword">Password:</label>
+                <input type="password" id="loginPassword" placeholder="Enter password">
+            </div>
+            <button onclick="login()" id="loginBtn">Login</button>
+            <div id="loginResult" class="result" style="display: none;"></div>
+        </div>
+
+        <div class="auth-section">
+            <h2>Demo Actions</h2>
+            <button onclick="registerDemoUser()">Create Demo User</button>
+            <button onclick="loginDemoUser()">Login Demo User</button>
+            <button onclick="clearResults()">Clear Results</button>
+        </div>
+    </div>
+
+    <script>
+        // Initialize elliptic curve (secp256r1/P-256)
+        const EC = elliptic.ec;
+        const ec = new EC('p256');
+
+        // Utility functions
+        function arrayBufferToBase64(buffer) {
+            const bytes = new Uint8Array(buffer);
+            let binary = '';
+            bytes.forEach(byte => binary += String.fromCharCode(byte));
+            return btoa(binary);
+        }
+
+        function base64ToArrayBuffer(base64) {
+            const binary = atob(base64);
+            const bytes = new Uint8Array(binary.length);
+            for (let i = 0; i < binary.length; i++) {
+                bytes[i] = binary.charCodeAt(i);
+            }
+            return bytes.buffer;
+        }
+
+        function generateSalt() {
+            return crypto.getRandomValues(new Uint8Array(32));
+        }
+
+        // PBKDF2 key derivation (equivalent to Python's derive_private_key)
+        async function derivePrivateKey(password, salt, iterations = 100000) {
+            const encoder = new TextEncoder();
+            const passwordBuffer = encoder.encode(password);
+
+            // Import password as key
+            const passwordKey = await crypto.subtle.importKey(
+                'raw',
+                passwordBuffer,
+                'PBKDF2',
+                false,
+                ['deriveBits']
+            );
+
+            // Derive key material
+            const derivedBits = await crypto.subtle.deriveBits(
+                {
+                    name: 'PBKDF2',
+                    salt: salt,
+                    iterations: iterations,
+                    hash: 'SHA-256'
+                },
+                passwordKey,
+                256 // 32 bytes
+            );
+
+            // Convert to BigInt for elliptic curve
+            const keyBytes = new Uint8Array(derivedBits);
+            let privateValue = 0n;
+            for (let i = 0; i < keyBytes.length; i++) {
+                privateValue = (privateValue << 8n) + BigInt(keyBytes[i]);
+            }
+
+            // Ensure it's within curve order (basic modular reduction)
+            const curveOrder = BigInt('0xffffffff00000000ffffffffffffffffbce6faada7179e84f3b9cac2fc632551');
+            privateValue = privateValue % curveOrder;
+
+            // Create elliptic curve key pair
+            const keyPair = ec.keyFromPrivate(privateValue.toString(16), 'hex');
+            return keyPair;
+        }
+
+        function showResult(elementId, content, type = 'info') {
+            const element = document.getElementById(elementId);
+            element.className = `result ${type}`;
+            element.textContent = JSON.stringify(content, null, 2);
+            element.style.display = 'block';
+        }
+
+        function updateStatus(statusId, success) {
+            const element = document.getElementById(statusId);
+            element.className = `status-indicator ${success ? 'status-success' : 'status-error'}`;
+        }
+
+        function setLoading(buttonId, loading) {
+            const button = document.getElementById(buttonId);
+            button.disabled = loading;
+            button.textContent = loading ? 'Loading...' : button.textContent.replace('Loading...', '').trim() || 'Submit';
+        }
+
+        // Registration function
+        async function register() {
+            const username = document.getElementById('regUsername').value;
+            const password = document.getElementById('regPassword').value;
+            const serverUrl = document.getElementById('serverUrl').value;
+
+            if (!username || !password) {
+                showResult('registerResult', { error: 'Please enter username and password' }, 'error');
+                return;
+            }
+
+            setLoading('registerBtn', true);
+
+            try {
+                // Generate salt
+                const salt = generateSalt();
+
+                // Derive private key from password
+                const keyPair = await derivePrivateKey(password, salt);
+
+                // Get public key in DER format (simulate the Python serialization)
+                const publicKeyPoint = keyPair.getPublic();
+                const x = publicKeyPoint.getX().toArrayLike(Uint8Array, 'be', 32);
+                const y = publicKeyPoint.getY().toArrayLike(Uint8Array, 'be', 32);
+
+                // Create DER-encoded public key (simplified version)
+                // This is a basic implementation - in production you'd use a proper ASN.1 library
+                const publicKeyBytes = new Uint8Array(64);
+                publicKeyBytes.set(x, 0);
+                publicKeyBytes.set(y, 32);
+
+                // For compatibility with the server, we'll create a proper DER structure
+                const derHeader = new Uint8Array([
+                    0x30, 0x59, // SEQUENCE, length 89
+                    0x30, 0x13, // SEQUENCE, length 19
+                    0x06, 0x07, 0x2a, 0x86, 0x48, 0xce, 0x3d, 0x02, 0x01, // OID for EC public key
+                    0x06, 0x08, 0x2a, 0x86, 0x48, 0xce, 0x3d, 0x03, 0x01, 0x07, // OID for P-256
+                    0x03, 0x42, 0x00, 0x04 // BIT STRING, length 66, unused bits 0, uncompressed point
+                ]);
+
+                const derPublicKey = new Uint8Array(derHeader.length + publicKeyBytes.length);
+                derPublicKey.set(derHeader, 0);
+                derPublicKey.set(publicKeyBytes, derHeader.length);
+
+                // Prepare request
+                const registerData = {
+                    username: username,
+                    public_key: arrayBufferToBase64(derPublicKey),
+                    salt: arrayBufferToBase64(salt)
+                };
+
+                // Send registration
+                const response = await fetch(`${serverUrl}/api/register`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(registerData)
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    showResult('registerResult', result, 'success');
+                    updateStatus('registerStatus', true);
+                } else {
+                    showResult('registerResult', result, 'error');
+                    updateStatus('registerStatus', false);
+                }
+
+            } catch (error) {
+                showResult('registerResult', { error: error.message }, 'error');
+                updateStatus('registerStatus', false);
+            } finally {
+                setLoading('registerBtn', false);
+            }
+        }
+
+        // Login function
+        async function login() {
+            const username = document.getElementById('loginUsername').value;
+            const password = document.getElementById('loginPassword').value;
+            const serverUrl = document.getElementById('serverUrl').value;
+
+            if (!username || !password) {
+                showResult('loginResult', { error: 'Please enter username and password' }, 'error');
+                return;
+            }
+
+            setLoading('loginBtn', true);
+
+            try {
+                // Step 1: Get challenge
+                const loginResponse = await fetch(`${serverUrl}/api/login`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ username: username })
+                });
+
+                if (!loginResponse.ok) {
+                    const error = await loginResponse.json();
+                    showResult('loginResult', error, 'error');
+                    updateStatus('loginStatus', false);
+                    return;
+                }
+
+                const loginData = await loginResponse.json();
+                const challenge = loginData.challenge;
+                const salt = new Uint8Array(base64ToArrayBuffer(loginData.salt));
+
+                // Step 2: Re-derive private key
+                const keyPair = await derivePrivateKey(password, salt);
+
+                // Step 3: Sign challenge
+                const challengeBytes = new TextEncoder().encode(challenge);
+                const hash = CryptoJS.SHA256(CryptoJS.lib.WordArray.create(challengeBytes));
+                const hashBytes = CryptoJS.enc.Hex.parse(hash.toString());
+
+                // Convert hash to bytes for signing
+                const hashArray = new Uint8Array(32);
+                for (let i = 0; i < 32; i++) {
+                    hashArray[i] = (hashBytes.words[Math.floor(i / 4)] >>> (24 - (i % 4) * 8)) & 0xff;
+                }
+
+                // Sign with elliptic
+                const signature = keyPair.sign(hashArray);
+
+                // Convert signature to DER format
+                const r = signature.r.toArrayLike(Uint8Array, 'be', 32);
+                const s = signature.s.toArrayLike(Uint8Array, 'be', 32);
+
+                // Create DER signature
+                const derSig = new Uint8Array(6 + r.length + s.length);
+                let offset = 0;
+                derSig[offset++] = 0x30; // SEQUENCE
+                derSig[offset++] = 4 + r.length + s.length; // Length
+                derSig[offset++] = 0x02; // INTEGER
+                derSig[offset++] = r.length; // Length of r
+                derSig.set(r, offset);
+                offset += r.length;
+                derSig[offset++] = 0x02; // INTEGER
+                derSig[offset++] = s.length; // Length of s
+                derSig.set(s, offset);
+
+                // Step 4: Send signature
+                const authData = {
+                    username: username,
+                    signature: arrayBufferToBase64(derSig)
+                };
+
+                const authResponse = await fetch(`${serverUrl}/api/authenticate`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(authData)
+                });
+
+                const result = await authResponse.json();
+
+                if (authResponse.ok) {
+                    showResult('loginResult', result, 'success');
+                    updateStatus('loginStatus', true);
+                } else {
+                    showResult('loginResult', result, 'error');
+                    updateStatus('loginStatus', false);
+                }
+
+            } catch (error) {
+                showResult('loginResult', { error: error.message }, 'error');
+                updateStatus('loginStatus', false);
+            } finally {
+                setLoading('loginBtn', false);
+            }
+        }
+
+        // Demo functions
+        async function registerDemoUser() {
+            document.getElementById('regUsername').value = 'alice';
+            document.getElementById('regPassword').value = 'my_secure_password';
+            await register();
+        }
+
+        async function loginDemoUser() {
+            document.getElementById('loginUsername').value = 'alice';
+            document.getElementById('loginPassword').value = 'my_secure_password';
+            await login();
+        }
+
+        function clearResults() {
+            ['registerResult', 'loginResult'].forEach(id => {
+                document.getElementById(id).style.display = 'none';
+            });
+            ['registerStatus', 'loginStatus'].forEach(id => {
+                document.getElementById(id).className = 'status-indicator status-pending';
+            });
+        }
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            // Add enter key support
+            ['regUsername', 'regPassword'].forEach(id => {
+                document.getElementById(id).addEventListener('keypress', function(e) {
+                    if (e.key === 'Enter') register();
+                });
+            });
+
+            ['loginUsername', 'loginPassword'].forEach(id => {
+                document.getElementById(id).addEventListener('keypress', function(e) {
+                    if (e.key === 'Enter') login();
+                });
+            });
+        });
+    </script>
+</body>
+</html>
